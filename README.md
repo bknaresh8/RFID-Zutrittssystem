@@ -2,7 +2,7 @@
 
 ## Projektbeschreibung
 
-Das RFID-Zutrittssystem soll den Zutritt mehrerer RFID-Transponder regelen. Dabei werden manchen Transpondern der
+Das RFID-Zutrittssystem soll den Zutritt mehrerer RFID-Transponder regeln. Dabei werden manchen Transpondern der
 Zutritt gewährt und manchen wiederrum nicht.
 
 * zweimaliges blinken: Zutritt verweigert
