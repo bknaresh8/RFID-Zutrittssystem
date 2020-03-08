@@ -18,5 +18,5 @@ Zutritt gewährt und manchen wiederrum nicht.
 
 ## Optional
 
-* schnelles und unaufwändiges hinzufügen neuer RFID-Transponder aus dem System
+* schnelles und unaufwändiges hinzufügen neuer RFID-Transponder ins System
 * schnelles und unaufwändiges entfernen alter RFID-Transponder aus dem System
