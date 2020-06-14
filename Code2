@@ -1,0 +1,202 @@
+/********************************************RFID-Zutrittssystem********************************************/
+/***************************von Philipp Hoppenkamps und Naresh Sivagnanasuntharam***************************/
+
+/****************************************Projektbeschreibung************************************************/
+/******Das RFID-Zutrittssystem soll den Zutritt mehrerer RFID-Transponder regeln. Dabei werden manchen 
+/**************Transpondern der Zutritt gewährt und manchen wiederrum nicht.********************************/
+
+/****************************- zweimaliges blinken: Zutritt verweigert**************************************/
+/********************************- dauerhaftes blinken: Zutritt gewährt*************************************/
+/************************- bei gewährtem Zutritt wird ein Servomotor angesteuert****************************/
+/********************************- Textausgabe (z.B. Guten Tag Herr xy)*************************************/
+
+
+
+//---------------------------------------------------------------Bibliothek-----------------------------------------------------------------
+
+#include <SPI.h>                                                   // Bibliothek für Kommuniktaion zwischen Bauteilen oder Leiterplatten
+#include <RFID.h>                                                  // Bibliothek für RFID Schreib- und Lesemodul (EXTERNE BIBLIOTHEK)
+#include <LiquidCrystal.h>                                         // Bibliotehk für das LCD
+#include <Servo.h>                                                 // Bibliothek für Servomotor
+
+//--------------------------------------------------------------Definitionen----------------------------------------------------------------
+
+#define SS_PIN 10                                                  // SS_Pin definieren  => SS (Slave Select) - Pin an jedem Gerät, mit dem der Master bestimmte Geräte aktivieren und deaktivieren kann
+#define RST_PIN 53                                                 // RST_Pin definieren => RST (Reset)       - Pin zum reset
+
+
+RFID rfid(SS_PIN,RST_PIN);                                         // RFID Schreib- Lesemodul bennenen
+
+const int rs=8, en=9, d4=4, d5=5, d6=6, d7=7;
+LiquidCrystal lcd (rs,en,d4,d5,d6,d7);
+
+//----------------------------------------------------------------Variablen-----------------------------------------------------------------
+
+const int led_gruen = 46;                                          // grüne lED ist auf dem Pin 46 angeschlossen
+const int led_rot = 47;                                            // rote LED ist auf dem Pin 47 angeschlossen
+const int buzzer = 22;                                             // Summer ist auf dem Pin 22 angeschlossen
+
+int seriennummer_karte[19][5] = {{208, 99,235, 37,125},            // Seriennummer von RFID-Chip bzw. NFC-Karte
+                                 {235, 53, 86, 27,147},            // Seriennummer von RFID-Chip bzw. NFC-Karte
+                                 {000,000,000,000,000},            // Seriennummer von RFID-Chip bzw. NFC-Karte
+                                 {000,000,000,000,000},            // Seriennummer von RFID-Chip bzw. NFC-Karte
+                                 {000,000,000,000,000},            // Seriennummer von RFID-Chip bzw. NFC-Karte
+                                 {000,000,000,000,000},            // Seriennummer von RFID-Chip bzw. NFC-Karte
+                                 {000,000,000,000,000},            // Seriennummer von RFID-Chip bzw. NFC-Karte
+                                 {000,000,000,000,000},            // Seriennummer von RFID-Chip bzw. NFC-Karte
+                                 {000,000,000,000,000},            // Seriennummer von RFID-Chip bzw. NFC-Karte
+                                 {000,000,000,000,000},            // Seriennummer von RFID-Chip bzw. NFC-Karte
+                                 {000,000,000,000,000},            // Seriennummer von RFID-Chip bzw. NFC-Karte
+                                 {000,000,000,000,000},            // Seriennummer von RFID-Chip bzw. NFC-Karte
+                                 {000,000,000,000,000},            // Seriennummer von RFID-Chip bzw. NFC-Karte
+                                 {000,000,000,000,000},            // Seriennummer von RFID-Chip bzw. NFC-Karte
+                                 {000,000,000,000,000},            // Seriennummer von RFID-Chip bzw. NFC-Karte
+                                 {000,000,000,000,000},            // Seriennummer von RFID-Chip bzw. NFC-Karte
+                                 {000,000,000,000,000},            // Seriennummer von RFID-Chip bzw. NFC-Karte
+                                 {000,000,000,000,000},            // Seriennummer von RFID-Chip bzw. NFC-Karte
+                                 {000,000,000,000,000}};           // Seriennummer von RFID-Chip bzw. NFC-Karte
+                              
+
+                           
+bool zutritt = false;                                              // Zutritt ist zuerst "falsch"
+
+
+
+//----------------------------------------------------------------Objekte-------------------------------------------------------------------
+
+Servo tuerschloss;                                                 // Servomotor wird als "tuerschloss" bezeichnet
+
+//--------------------------------------------------------------void setup()----------------------------------------------------------------
+
+void setup()
+{
+  Serial.begin(9600);                                              // Ausgabe Serieller Monitor
+  SPI.begin();                                                     // Ausgabe Serieller Monitor 
+                                                    
+  rfid.init();                                                     // wird beim Programmstart einmal ausgeführt und enthält alle Initialisierungen, die das Programm benötigt, z. B. die Festlegung der Datenrichtung bei E/A-Ports etc.
+
+  tuerschloss.attach(45);                                          // Servomotor ist auf dem Pin 45 angeschlossen
+
+
+  pinMode(led_rot, OUTPUT);                                        // rote LED als Ausgang deklariert
+  pinMode (led_gruen,OUTPUT);                                      // grüne LED als Ausgang deklariert
+  digitalWrite(led_rot, LOW);                                      // rote LED ist beim Start des Programms aus
+  digitalWrite (led_gruen,LOW);                                    // grüne LED ist beim Start des Programms aus
+
+  lcd.begin(16,2);                                                 // LCD Textausgabe
+  lcd.print("   Guten Tag    ");                                   // LCD Textausgabe
+  lcd.setCursor(0,2);                                              // LCD Textausgabe
+  lcd.print(" identifizieren ");                                   // LCD Textausgabe
+
+}
+
+
+
+//----------------------------------------------------------------void verarbeitung()------------------------------------------------------
+
+void verarbeitung()
+{
+  if(rfid.isCard())
+  {
+    if(rfid.readCardSerial())
+    {
+      Serial.print(rfid.serNum[0]);                                // Anzeigen vom 1. Block der Kartennummer im seriellen Monitor
+      Serial.print(" ");                                           // Anzeigen vom 1. Block der Kartennummer im seriellen Monitor
+      Serial.print(rfid.serNum[1]);                                // Anzeigen vom 2. Block der Kartennummer im seriellen Monitor
+      Serial.print(" ");                                           // Anzeigen vom 2. Block der Kartennummer im seriellen Monitor
+      Serial.print(rfid.serNum[2]);                                // Anzeigen vom 3. Block der Kartennummer im seriellen Monitor
+      Serial.print(" ");                                           // Anzeigen vom 3. Block der Kartennummer im seriellen Monitor
+      Serial.print(rfid.serNum[3]);                                // Anzeigen vom 4. Block der Kartennummer im seriellen Monitor
+      Serial.print(" ");                                           // Anzeigen vom 4. Block der Kartennummer im seriellen Monitor
+      Serial.print(rfid.serNum[4]);                                // Anzeigen vom 5. Block der Kartennummer im seriellen Monitor
+      Serial.println(" ");                                         // Anzeigen vom 5. Block der Kartennummer im seriellen Monitor
+      
+      
+           
+      for(int x = 0; x < sizeof(seriennummer_karte); x++)          // "x" hochzählen
+      {
+        for(int i = 0; i < sizeof(rfid.serNum); i++ )              // "i" hochzählen
+        {
+          if(rfid.serNum[i] != seriennummer_karte[x][i])           // "x" und "i" werden mit dem gemessenen Wert verglichen
+          {
+            zutritt = false;                                       // Zutritt falsch
+                      break;                                       // aus "for-Schleife" springen
+
+          }
+          else                                                     // ...ansonsten...
+          {
+            zutritt = true;                                        // falsch
+            
+          }
+        }
+        if(zutritt) break;                                         // aus "for-Schleife" springen
+      }
+           
+     }
+     if(zutritt)
+     {
+      Serial.println("Zutritt gewaehrt");                          // Serieller Monitor Textausgabe
+      {
+        digitalWrite(led_gruen, HIGH);                             // grünen LED wird aktiviert
+        tuerschloss.write(270);                                    // ansteuern des Servomotors um +90°
+        tone(buzzer, 950);                                         // Ton Summer AKTIVIEREN (Zutritt gewährt)
+                                     
+        lcd.clear();                                               // LCD Textausgabe
+        lcd.setCursor(4,0);                                        // LCD Textausgabe
+        lcd.print("Zutritt");                                      // LCD Textausgabe
+        lcd.setCursor(3,2);                                        // LCD Textausgabe
+        lcd.print(" gewaehrt");                                    // LCD Textausgabe
+       
+        delay(5000);                                               // 5000ms Pause
+        
+        digitalWrite(led_gruen, LOW);                              // grüne LED wird deaktiviert
+        tuerschloss.write(90);                                     // ansteuern des Servomotors um -90°
+        noTone(buzzer);                                            // Ton Summer DEAKTIVIEREN (Zutritt nicht mehr gewährt)
+        zutritt = false;                                           // Zutritt nicht mehr gewährt                
+
+        lcd.clear();                                               // LCD Textausgabe
+        delay(500);                                                // LCD Textausgabe
+        lcd.print("   Guten Tag    ");                             // LCD Textausgabe
+        lcd.setCursor(0,2);                                        // LCD Textausgabe
+        lcd.print(" identifizieren ");                             // LCD Textausgabe
+      }
+     }
+     else                                                          // ...ansonsten...
+     {
+      Serial.println("Zutritt verweigert");                        // Serieller Monitor Textausgabe
+      
+      lcd.clear();                                                 // LCD Textausgabe
+      lcd.setCursor(4,0);                                          // LCD Textausgabe
+      lcd.print("Zutritt");                                        // LCD Textausgabe
+      lcd.setCursor(3,2);                                          // LCD Textausgabe
+      lcd.print("verweigert");                                     // LCD Textausgabe
+                              
+      digitalWrite(led_rot, HIGH);                                 // Blinken der roten LED
+      tone(buzzer, 200);                                           // Ton Summer AKTIVIEREN (Zutritt verweigert)
+      delay(500);                                                  // 5000ms Pause
+      digitalWrite(led_rot, LOW);                                  // Blinken der roten LED
+      noTone(buzzer);                                              // Ton Summer DEAKTIVIEREN (Zutritt verweigert)
+      delay(500);                                                  // 5000ms Pause
+      digitalWrite(led_rot, HIGH);                                 // Blinken der roten LED
+      tone(buzzer, 200);                                           // Ton Summer AKTIVIEREN (Zutritt verweigert)  
+      delay(500);                                                  // 5000ms Pause
+      digitalWrite(led_rot, LOW);                                  // Blinken der roten LED
+      noTone(buzzer);                                              // Ton Summer DEAKTIVIEREN (Zutritt verweigert)
+
+      delay(3500);                                                 // LCD Textausgabe
+      lcd.clear();                                                 // LCD Textausgabe
+      delay(500);                                                  // LCD Textausgabe
+      lcd.print("   Guten Tag    ");                               // LCD Textausgabe
+      lcd.setCursor(0,2);                                          // LCD Textausgabe
+      lcd.print(" identifizieren ");                               // LCD Textausgabe     
+     }
+     rfid.halt();                                                  // Sketch stoppen
+   }
+}
+
+//----------------------------------------------------------------void loop()--------------------------------------------------------------
+
+void loop()
+{     
+  verarbeitung();                                                  // void verarbeitung()
+}
